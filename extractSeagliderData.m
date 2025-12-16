@@ -305,6 +305,8 @@ function [s, data] = extractSeagliderData(dir_path, missionID)
     % interpolate t,s to p of pressure and compute ph
     ndive = length(data.ph.p);
     data.ph.ph = cell(ndive,1);
+    data.ph.s = cell(ndive, 1);
+    data.ph.t = cell(ndive, 1);
     for n = 1:ndive
         if ~isempty(data.ph.Vrse{n})
             [~,iuse] = unique(data.ctd.time{n});
@@ -312,8 +314,8 @@ function [s, data] = extractSeagliderData(dir_path, missionID)
                 ss = interp1(data.ctd.time{n}(iuse),data.ctd.s{n}(iuse),data.ph.time{n},'linear','extrap'); % interpolate in time rather than pressure since time is monotonic
                 tt = interp1(data.ctd.time{n}(iuse),data.ctd.t{n}(iuse),data.ph.time{n},'linear','extrap');
                 [~,data.ph.ph{n}] = phcalc_jp(data.ph.Vrse{n},data.ph.p{n},tt,ss,k0,k2,Pcoefs);
-                data.ph.s{n} = ss;
-                data.ph.t{n} = tt;
+                data.ph.s{n} = ss(:);
+                data.ph.t{n} = tt(:);
             else
                 data.ph.ph{n} = nan(size(data.ph.Vrse{n}));
                 data.ph.s{n} = nan(size(data.ph.Vrse{n}));
