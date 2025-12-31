@@ -324,6 +324,62 @@ function [s, data] = extractSeagliderData(dir_path, missionID)
         end
     end
 
+    % Dissolved Oxygen data structure
+    data.dox = struct();
+    data.dox.info = struct();
+    data.dox.oxphase = cell(size(s.ctd_pressure));
+    data.dox.thermv = cell(size(s.ctd_pressure));
+    data.dox.oxconc = s.aanderaa4831_dissolved_oxygen;
+    data.dox.thermt = cell(size(s.ctd_pressure));
+    data.dox.ndive = cell2mat(s.log_dive);
+    data.dox.p = cell(size(s.ctd_pressure));  
+    data.dox.depth = cell(size(s.ctd_pressure));
+    data.dox.ox = s.aanderaa4831_dissolved_oxygen;
+    data.dox.oxumolkg = s.aanderaa4831_dissolved_oxygen;
+    % fet time relative to divestart (for bin_sp2 compatibility)
+    data.dox.time = cell(size(s.aanderaa4831_results_time));
+    for i = 1:length(s.aanderaa4831_results_time)
+        if ~isempty(s.aanderaa4831_results_time{i})
+            data.dox.time{i} = s.aanderaa4831_results_time{i} - data.gps.time.divestart(i);
+        else
+            data.dox.time{i} = [];
+        end
+    end
+    
+    % No pressure variable for fet. Interp p from ctd onto fet time grid
+    for i = 1:length(s.ctd_pressure)
+        if ~isempty(s.ctd_pressure{i}) && ~isempty(data.dox.time{i})
+            % Remove duplicate times while preserving order
+            [~, ia] = unique(data.ctd.time{i}, 'stable');
+            
+            % Only interpolate if we have valid data
+            if length(ia) > 1
+                data.dox.p{i} = interp1(data.ctd.time{i}(ia), data.ctd.p{i}(ia), ...
+                                       data.dox.time{i}, 'linear', 'extrap');
+                data.dox.depth{i} = interp1(data.ctd.time{i}(ia), data.ctd.depth{i}(ia), ...
+                                       data.dox.time{i}, 'linear', 'extrap');
+                % data.ph.depth{i} = sw_dpth(data.ph.p{i},data.gps.lat.divestart(i));
+            else
+                data.dox.p{i} = [];
+                data.dox.depth{i} = [];
+            end
+        else
+            data.dox.p{i} = [];
+            data.dox.depth{i} = [];
+        end
+    end
+    % Determine cast phase (upcast/downcast) for each profile
+    % Phase = 1 for downcast (ascent), 0 for upcast (ascent)
+    data.dox.phase = cell(size(data.dox.p));
+    for i = 1:length(data.dox.p)
+        if ~isempty(data.dox.p{i})
+            data.dox.phase{i} = data.dox.time{i} < data.ctd.start_of_climb_time{i};
+        else
+            data.dox.phase{i} = [];
+        end
+    end
+
+
     % Quality control structure
     data.qual = struct();
     
@@ -369,6 +425,14 @@ function [s, data] = extractSeagliderData(dir_path, missionID)
     for i = 1:length(data.ph.Vrse)
         data.qual.ph.ph{i} = zeros(size(data.ph.Vrse{i}));
     end
+
+    % Dissolved Oxygen QC
+    data.qual.dox = struct();
+    data.qual.dox.ox = cell(size(data.ctd.t));
+    for i = 1:length(data.dox.oxumolkg)
+        data.qual.dox.ox{i} = zeros(size(data.dox.oxumolkg{i}));
+    end
+
     % data.opt = struct();
 
     % Top-level convenience arrays (nx2: column 1 = divestart, column 2 = diveend)
